@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>JARVIS — AI Assistant</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Inter',sans-serif;background:#0a0a0f;color:#e2e8f0;-webkit-font-smoothing:antialiased}
+
+/* ── VARIABLES ── */
+:root{
+  --bg:#0a0a0f;
+  --surface:#111118;
+  --surface2:#18181f;
+  --border:#2a2a38;
+  --border-hover:#3d3d52;
+  --accent:#6366f1;
+  --accent-dim:rgba(99,102,241,0.15);
+  --accent-glow:rgba(99,102,241,0.3);
+  --text:#e2e8f0;
+  --text-muted:#64748b;
+  --text-dim:#94a3b8;
+  --green:#10b981;
+  --red:#ef4444;
+  --yellow:#f59e0b;
+  --blue:#3b82f6;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+
+/* ── LOGIN ── */
+#loginScreen{
+  position:fixed;inset:0;z-index:200;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--bg);
+}
+.login-card{
+  width:400px;padding:40px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow:0 24px 64px rgba(0,0,0,0.5);
+}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.login-logo .icon{
+  width:44px;height:44px;border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;
+}
+.login-logo h1{font-size:1.5rem;font-weight:700;letter-spacing:-0.02em}
+.login-logo span{display:block;font-size:.75rem;color:var(--text-muted);font-weight:400;margin-top:2px}
+.login-desc{color:var(--text-muted);font-size:.875rem;line-height:1.6;margin-bottom:28px}
+.login-desc strong{color:var(--yellow)}
+.google-btn{
+  width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:12px 20px;border-radius:10px;
+  background:var(--surface2);border:1px solid var(--border);
+  color:var(--text);font-size:.9rem;font-weight:500;cursor:pointer;
+  transition:all .2s;font-family:'Inter',sans-serif;
+}
+.google-btn:hover{border-color:var(--accent);background:var(--accent-dim);box-shadow:0 0 0 1px var(--accent)}
+.google-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-note{margin-top:16px;font-size:.75rem;color:var(--text-muted);text-align:center}
+
+/* ── APP SHELL ── */
+#app{display:none;height:100vh;flex-direction:column}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:260px;
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;z-index:10;
+}
+.sidebar-logo{
+  padding:20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.sidebar-logo .icon{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;
+}
+.sidebar-logo h2{font-size:1.1rem;font-weight:700;letter-spacing:-0.02em}
+.sidebar-logo span{font-size:.65rem;color:var(--text-muted)}
+
+.sidebar-user{
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:10px;
+}
+.sidebar-user img{width:32px;height:32px;border-radius:50%;border:2px solid var(--border);flex-shrink:0}
+.sidebar-user .uinfo{flex:1;min-width:0}
+.sidebar-user .uname{font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-user .uemail{font-size:.68rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.signout-btn{
+  background:none;border:none;cursor:pointer;color:var(--text-muted);
+  padding:4px;border-radius:6px;transition:all .2s;font-size:.8rem;
+}
+.signout-btn:hover{color:var(--red);background:rgba(239,68,68,.1)}
+
+.sidebar-nav{padding:12px 10px;flex:1;overflow-y:auto}
+.nav-label{font-size:.65rem;font-weight:600;color:var(--text-muted);letter-spacing:.08em;text-transform:uppercase;padding:0 8px;margin:8px 0 4px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;padding:9px 10px;
+  border-radius:8px;cursor:pointer;transition:all .15s;
+  font-size:.85rem;font-weight:500;color:var(--text-dim);margin-bottom:2px;
+  border:none;background:none;width:100%;text-align:left;
+}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-dim);color:var(--accent);border:1px solid rgba(99,102,241,.2)}
+.nav-item .ni{width:18px;text-align:center;font-size:1rem;flex-shrink:0}
+.nav-item .nl{flex:1}
+.nav-item .nb{
+  font-size:.6rem;padding:2px 6px;border-radius:4px;
+  background:var(--green);color:#fff;font-weight:600;
+}
+.nav-item .nb.soon{background:var(--yellow);color:#000}
+
+.sidebar-footer{padding:12px 10px;border-top:1px solid var(--border)}
+.status-row{display:flex;gap:6px;flex-wrap:wrap}
+.status-chip{
+  display:flex;align-items:center;gap:4px;
+  font-size:.65rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;
+}
+.status-dot{width:5px;height:5px;border-radius:50%;background:var(--green)}
+
+/* ── MAIN ── */
+.main{
+  margin-left:260px;height:100vh;display:flex;flex-direction:column;
+  background:var(--bg);
+}
+
+/* ── TOP BAR ── */
+.topbar{
+  padding:16px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;flex-shrink:0;
+  background:var(--surface);
+}
+.back-btn{
+  display:none;align-items:center;gap:6px;padding:6px 12px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  color:var(--text-dim);font-size:.8rem;cursor:pointer;transition:all .2s;
+  font-family:'Inter',sans-serif;
+}
+.back-btn:hover{border-color:var(--accent);color:var(--accent)}
+.back-btn.show{display:flex}
+.topbar-title{font-size:1rem;font-weight:600;flex:1}
+.topbar-sub{font-size:.75rem;color:var(--text-muted)}
+
+/* ── CONTENT AREA ── */
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column}
+
+/* ── CHAT MODE ── */
+#chatMode{display:flex;flex-direction:column;height:100%}
+.chat-msgs{flex:1;overflow-y:auto;padding:24px}
+.chat-msgs .empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:16px;text-align:center;
+}
+.empty-state .big-icon{font-size:3rem;margin-bottom:8px}
+.empty-state h3{font-size:1.25rem;font-weight:600}
+.empty-state p{color:var(--text-muted);font-size:.9rem;max-width:380px;line-height:1.6}
+.quick-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:8px}
+.chip{
+  padding:8px 14px;border-radius:20px;
+  background:var(--surface2);border:1px solid var(--border);
+  font-size:.8rem;color:var(--text-dim);cursor:pointer;transition:all .2s;
+}
+.chip:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+
+.msg{display:flex;gap:12px;margin-bottom:20px;animation:fadeUp .25s ease-out}
+.msg.user{flex-direction:row-reverse}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.msg-avatar{
+  width:32px;height:32px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;margin-top:2px;
+}
+.msg.user .msg-avatar{background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff}
+.msg.assistant .msg-avatar{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);font-size:.85rem}
+.msg-body{max-width:72%}
+.msg-meta{font-size:.7rem;color:var(--text-muted);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.msg-badge{
+  font-size:.62rem;padding:1px 6px;border-radius:4px;font-family:'JetBrains Mono',monospace;
+  background:var(--accent-dim);color:var(--accent);border:1px solid rgba(99,102,241,.2);
+}
+.msg-search-badge{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:.7rem;color:var(--yellow);background:rgba(245,158,11,.08);
+  border:1px solid rgba(245,158,11,.2);border-radius:4px;padding:2px 8px;margin-bottom:6px;
+}
+.msg-bubble{
+  padding:12px 16px;border-radius:12px;font-size:.9rem;line-height:1.65;
+}
+.msg.user .msg-bubble{
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;
+  border-bottom-right-radius:4px;
+}
+.msg.assistant .msg-bubble{
+  background:var(--surface);border:1px solid var(--border);
+  border-bottom-left-radius:4px;
+}
+.typing-dots{display:flex;gap:4px;padding:4px 0;align-items:center}
+.typing-dots span{
+  width:7px;height:7px;border-radius:50%;background:var(--accent);
+  animation:tdot 1.2s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2){animation-delay:.2s}
+.typing-dots span:nth-child(3){animation-delay:.4s}
+@keyframes tdot{0%,80%,100%{transform:scale(.5);opacity:.3}40%{transform:scale(1);opacity:1}}
+
+/* ── CHAT INPUT ── */
+.chat-input-area{
+  padding:16px 24px;border-top:1px solid var(--border);
+  background:var(--surface);flex-shrink:0;
+}
+.img-preview-bar{
+  display:none;align-items:center;gap:10px;
+  padding:8px 12px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;margin-bottom:10px;
+}
+.img-preview-bar img{width:40px;height:40px;object-fit:cover;border-radius:6px}
+.img-preview-bar span{flex:1;font-size:.8rem;color:var(--text-muted)}
+.img-rm{background:none;border:none;cursor:pointer;color:var(--text-muted);padding:4px;border-radius:4px;font-size:.9rem;transition:color .2s}
+.img-rm:hover{color:var(--red)}
+
+.input-box{display:flex;gap:10px;align-items:flex-end}
+.input-btns{display:flex;gap:6px}
+.icon-btn{
+  width:40px;height:40px;border-radius:10px;background:var(--surface2);
+  border:1px solid var(--border);color:var(--text-muted);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:1rem;
+  transition:all .2s;flex-shrink:0;
+}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-dim)}
+.icon-btn.recording{background:rgba(239,68,68,.15);border-color:var(--red);color:var(--red);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.input-wrap{flex:1}
+textarea{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;font-family:'Inter',sans-serif;
+  font-size:.9rem;color:var(--text);resize:none;outline:none;
+  transition:border-color .2s;line-height:1.5;max-height:120px;
+}
+textarea:focus{border-color:var(--accent)}
+textarea::placeholder{color:var(--text-muted)}
+.send-btn{
+  width:40px;height:40px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  border:none;color:#fff;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;font-size:1rem;
+  transition:all .2s;flex-shrink:0;
+}
+.send-btn:hover{opacity:.9;transform:translateY(-1px)}
+.send-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+/* ── TOOL MODES ── */
+.tool-mode{display:none;flex-direction:column;height:100%;padding:24px;overflow-y:auto}
+.tool-mode.active{display:flex}
+.tool-header{margin-bottom:24px}
+.tool-header h2{font-size:1.3rem;font-weight:700;margin-bottom:4px}
+.tool-header p{color:var(--text-muted);font-size:.875rem}
+
+.tool-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;padding:20px;margin-bottom:16px;
+}
+.tool-card h3{font-size:.95rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+
+/* Image Analysis */
+.upload-area{
+  border:2px dashed var(--border);border-radius:10px;padding:32px;
+  text-align:center;cursor:pointer;transition:all .2s;
+}
+.upload-area:hover,.upload-area.dragover{border-color:var(--accent);background:var(--accent-dim)}
+.upload-area .ua-icon{font-size:2.5rem;margin-bottom:10px}
+.upload-area p{color:var(--text-muted);font-size:.85rem}
+.upload-area strong{color:var(--accent)}
+.img-full-preview{display:none;margin-bottom:12px}
+.img-full-preview img{max-width:100%;max-height:300px;border-radius:8px;border:1px solid var(--border)}
+
+/* YouTube */
+.url-input-row{display:flex;gap:8px}
+.url-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:10px 14px;font-family:'Inter',sans-serif;
+  font-size:.9rem;color:var(--text);outline:none;transition:border-color .2s;
+}
+.url-input:focus{border-color:var(--accent)}
+.url-input::placeholder{color:var(--text-muted)}
+.action-btn{
+  padding:10px 18px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  border:none;color:#fff;font-size:.85rem;font-weight:500;
+  cursor:pointer;transition:all .2s;font-family:'Inter',sans-serif;white-space:nowrap;
+}
+.action-btn:hover{opacity:.9}
+.action-btn:disabled{opacity:.4;cursor:not-allowed}
+.result-box{
+  background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:16px;font-size:.875rem;line-height:1.7;color:var(--text-dim);
+  max-height:400px;overflow-y:auto;white-space:pre-wrap;
+}
+
+/* TTS */
+.tts-textarea{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:14px;font-family:'Inter',sans-serif;
+  font-size:.9rem;color:var(--text);resize:vertical;outline:none;
+  min-height:120px;transition:border-color .2s;
+}
+.tts-textarea:focus{border-color:var(--accent)}
+.voice-select{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;color:var(--text);
+  font-family:'Inter',sans-serif;font-size:.85rem;outline:none;cursor:pointer;
+}
+.audio-player{margin-top:12px;width:100%;border-radius:8px;outline:none}
+
+/* Spinner */
+.spinner{
+  width:20px;height:20px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;display:inline-block;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:24px;right:24px;
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:12px 18px;font-size:.85rem;
+  color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.4);
+  opacity:0;transform:translateY(10px);
+  transition:all .3s;z-index:999;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{border-color:var(--green);color:var(--green)}
+.toast.error{border-color:var(--red);color:var(--red)}
+
+/* Voice wave animation */
+.voice-wave{display:none;align-items:center;gap:3px;padding:4px 0}
+.voice-wave.show{display:flex}
+.voice-wave span{
+  width:3px;background:var(--red);border-radius:2px;
+  animation:wave .8s ease-in-out infinite;
+}
+.voice-wave span:nth-child(1){height:8px;animation-delay:0s}
+.voice-wave span:nth-child(2){height:16px;animation-delay:.1s}
+.voice-wave span:nth-child(3){height:12px;animation-delay:.2s}
+.voice-wave span:nth-child(4){height:20px;animation-delay:.3s}
+.voice-wave span:nth-child(5){height:14px;animation-delay:.4s}
+@keyframes wave{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
+
+@media(max-width:768px){
+  .sidebar{width:220px}
+  .main{margin-left:220px}
+}
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="icon">🤖</div>
+      <div>
+        <h1>JARVIS</h1>
+        <span>AI Assistant · Personal Access Only</span>
+      </div>
+    </div>
+    <p class="login-desc">
+      Sign in with your Google account to access JARVIS.<br>
+      <strong>⚠ Unauthorized access is blocked</strong> to protect API credits.
+    </p>
+    <button class="google-btn" id="googleBtn" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 24 24">
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+      </svg>
+      Continue with Google
+    </button>
+    <p class="login-note">Your data is secured via Supabase Auth</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="icon">🤖</div>
+      <div>
+        <h2>JARVIS</h2>
+        <span style="font-size:.65rem;color:var(--text-muted)">AI Assistant</span>
+      </div>
+    </div>
+
+    <div class="sidebar-user">
+      <img id="userAvatar" src="" alt="avatar" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%236366f1%22/><text x=%2212%22 y=%2216%22 text-anchor=%22middle%22 fill=%22white%22 font-size=%2212%22>U</text></svg>'"/>
+      <div class="uinfo">
+        <div class="uname" id="userName">User</div>
+        <div class="uemail" id="userEmail">user@email.com</div>
+      </div>
+      <button class="signout-btn" onclick="signOut()" title="Sign out">↩</button>
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-label">Chat</div>
+      <button class="nav-item active" id="nav-chat" onclick="switchMode('chat')">
+        <span class="ni">💬</span><span class="nl">AI Chat</span><span class="nb">Live</span>
+      </button>
+
+      <div class="nav-label" style="margin-top:12px">Tools</div>
+      <button class="nav-item" id="nav-image" onclick="switchMode('image')">
+        <span class="ni">🖼️</span><span class="nl">Image Analysis</span><span class="nb">Live</span>
+      </button>
+      <button class="nav-item" id="nav-search" onclick="switchMode('search')">
+        <span class="ni">🔍</span><span class="nl">Web Search</span><span class="nb">Live</span>
+      </button>
+      <button class="nav-item" id="nav-youtube" onclick="switchMode('youtube')">
+        <span class="ni">▶️</span><span class="nl">YouTube Summary</span><span class="nb">Live</span>
+      </button>
+      <button class="nav-item" id="nav-tts" onclick="switchMode('tts')">
+        <span class="ni">🔊</span><span class="nl">Text to Speech</span><span class="nb">Live</span>
+      </button>
+      <button class="nav-item" id="nav-voice" onclick="switchMode('voice')">
+        <span class="ni">🎙️</span><span class="nl">Voice Chat</span><span class="nb">Live</span>
+      </button>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="status-row">
+        <div class="status-chip"><div class="status-dot"></div>GROQ</div>
+        <div class="status-chip"><div class="status-dot"></div>GEMINI</div>
+        <div class="status-chip"><div class="status-dot"></div>TAVILY</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <button class="back-btn" id="backBtn" onclick="switchMode('chat')">← Back to Chat</button>
+      <div>
+        <div class="topbar-title" id="topbarTitle">AI Chat</div>
+        <div class="topbar-sub" id="topbarSub">Powered by GROQ Llama 3.3 70B + Tavily Search</div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ═══ CHAT MODE ═══ -->
+      <div id="chatMode" style="display:flex;flex-direction:column;height:100%">
+        <div class="chat-msgs" id="chatMsgs">
+          <div class="empty-state" id="emptyState">
+            <div class="big-icon">🤖</div>
+            <h3>How can I help you today?</h3>
+            <p>Ask me anything — I can chat, search the web in real-time, and remember our conversation.</p>
+            <div class="quick-chips">
+              <div class="chip" onclick="setQ('What is the latest news in AI today?')">📰 Latest AI News</div>
+              <div class="chip" onclick="setQ('Explain machine learning simply')">🧠 Explain ML</div>
+              <div class="chip" onclick="setQ('Oka chinna Telugu joke cheppu')">😄 Telugu Joke</div>
+              <div class="chip" onclick="setQ('What is the weather like in Hyderabad today?')">🌤️ Weather</div>
+            </div>
+          </div>
+        </div>
+        <div class="chat-input-area">
+          <div class="img-preview-bar" id="imgPreviewBar">
+            <img id="imgThumb" src="" alt=""/>
+            <span id="imgName">image.png</span>
+            <button class="img-rm" onclick="removeImg()">✕</button>
+          </div>
+          <div class="input-box">
+            <div class="input-btns">
+              <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="onImgSelect(event)"/>
+              <button class="icon-btn" onclick="document.getElementById('fileInput').click()" title="Attach image">📎</button>
+              <button class="icon-btn" id="voiceInputBtn" onclick="toggleVoiceInput()" title="Voice input">🎙️</button>
+            </div>
+            <div class="input-wrap">
+              <div class="voice-wave" id="voiceWave">
+                <span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <textarea id="chatInput" placeholder="Ask JARVIS anything… (Enter to send, Shift+Enter for newline)" rows="1" onkeydown="onKey(event)" oninput="resize(this)"></textarea>
+            </div>
+            <button class="send-btn" id="sendBtn" onclick="sendChat()">➤</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ IMAGE ANALYSIS MODE ═══ -->
+      <div class="tool-mode" id="imageMode">
+        <div class="tool-header">
+          <h2>🖼️ Image Analysis</h2>
+          <p>Upload any image and ask JARVIS to analyze, describe, or extract information from it using Gemini Vision AI.</p>
+        </div>
+
+        <div class="tool-card">
+          <h3>📤 Upload Image</h3>
+          <input type="file" id="imgAnalysisInput" accept="image/*" style="display:none" onchange="onImgAnalysisSelect(event)"/>
+          <div class="upload-area" id="uploadArea" onclick="document.getElementById('imgAnalysisInput').click()"
+            ondragover="event.preventDefault();this.classList.add('dragover')"
+            ondragleave="this.classList.remove('dragover')"
+            ondrop="onImgDrop(event)">
+            <div class="ua-icon">🖼️</div>
+            <p>Click to upload or <strong>drag & drop</strong><br>PNG, JPG, WEBP up to 5MB</p>
+          </div>
+          <div class="img-full-preview" id="imgFullPreview">
+            <img id="imgFullThumb" src="" alt="preview"/>
+          </div>
+        </div>
+
+        <div class="tool-card">
+          <h3>❓ Ask about the image</h3>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <input class="url-input" id="imgQuestion" placeholder="What do you see? Describe this image. Extract text from this image..." value="Describe this image in detail"/>
+            <button class="action-btn" onclick="analyzeImage()">Analyze</button>
+          </div>
+          <div class="quick-chips" style="justify-content:flex-start;margin-bottom:12px">
+            <div class="chip" onclick="document.getElementById('imgQuestion').value='Describe this image in detail'">Describe</div>
+            <div class="chip" onclick="document.getElementById('imgQuestion').value='Extract all text from this image'">Extract Text</div>
+            <div class="chip" onclick="document.getElementById('imgQuestion').value='What objects can you identify?'">Objects</div>
+            <div class="chip" onclick="document.getElementById('imgQuestion').value='Analyze the emotions in this image'">Emotions</div>
+          </div>
+          <div class="result-box" id="imgResult" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- ═══ WEB SEARCH MODE ═══ -->
+      <div class="tool-mode" id="searchMode">
+        <div class="tool-header">
+          <h2>🔍 Web Search</h2>
+          <p>Search the live web using Tavily AI. Get real-time information, news, prices, and more.</p>
+        </div>
+        <div class="tool-card">
+          <h3>🌐 Search Query</h3>
+          <div class="url-input-row" style="margin-bottom:12px">
+            <input class="url-input" id="searchQuery" placeholder="Search anything — news, prices, weather, facts..." onkeydown="if(event.key==='Enter')doSearch()"/>
+            <button class="action-btn" onclick="doSearch()">Search</button>
+          </div>
+          <div class="quick-chips" style="justify-content:flex-start;margin-bottom:12px">
+            <div class="chip" onclick="document.getElementById('searchQuery').value='Latest AI news today';doSearch()">📰 AI News</div>
+            <div class="chip" onclick="document.getElementById('searchQuery').value='Bitcoin price today';doSearch()">₿ Crypto</div>
+            <div class="chip" onclick="document.getElementById('searchQuery').value='Hyderabad weather today';doSearch()">🌤️ Weather</div>
+            <div class="chip" onclick="document.getElementById('searchQuery').value='Top movies 2025';doSearch()">🎬 Movies</div>
+          </div>
+          <div class="result-box" id="searchResult" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- ═══ YOUTUBE MODE ═══ -->
+      <div class="tool-mode" id="youtubeMode">
+        <div class="tool-header">
+          <h2>▶️ YouTube Video Summarizer</h2>
+          <p>Paste any YouTube video URL to get a full AI-generated summary, key points, and transcript data.</p>
+        </div>
+        <div class="tool-card">
+          <h3>🔗 YouTube URL</h3>
+          <div class="url-input-row" style="margin-bottom:12px">
+            <input class="url-input" id="ytUrl" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')summarizeYT()"/>
+            <button class="action-btn" onclick="summarizeYT()">Summarize</button>
+          </div>
+          <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:12px">
+            ℹ️ Works best with videos that have auto-generated or manual captions.
+          </div>
+          <div class="result-box" id="ytResult" style="display:none"></div>
+        </div>
+      </div>
+
+      <!-- ═══ TEXT TO SPEECH MODE ═══ -->
+      <div class="tool-mode" id="ttsMode">
+        <div class="tool-header">
+          <h2>🔊 Text to Speech</h2>
+          <p>Convert any text into natural-sounding audio using your browser's built-in speech engine. Free & instant.</p>
+        </div>
+        <div class="tool-card">
+          <h3>📝 Enter Text</h3>
+          <textarea class="tts-textarea" id="ttsText" placeholder="Type or paste any text here to convert to speech...">Hello! I am JARVIS, your personal AI assistant. How can I help you today?</textarea>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap">
+            <div>
+              <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:4px">Voice</label>
+              <select class="voice-select" id="voiceSelect"></select>
+            </div>
+            <div>
+              <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:4px">Speed</label>
+              <select class="voice-select" id="speedSelect">
+                <option value="0.7">Slow (0.7x)</option>
+                <option value="1" selected>Normal (1x)</option>
+                <option value="1.3">Fast (1.3x)</option>
+                <option value="1.6">Very Fast (1.6x)</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:4px">Pitch</label>
+              <select class="voice-select" id="pitchSelect">
+                <option value="0.8">Low</option>
+                <option value="1" selected>Normal</option>
+                <option value="1.3">High</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:18px">
+              <button class="action-btn" onclick="speakText()">▶ Speak</button>
+              <button class="action-btn" style="background:var(--surface2);border:1px solid var(--border);color:var(--text)" onclick="stopSpeech()">⏹ Stop</button>
+            </div>
+          </div>
+        </div>
+        <div class="tool-card">
+          <h3>💡 Quick Examples</h3>
+          <div class="quick-chips" style="justify-content:flex-start">
+            <div class="chip" onclick="document.getElementById('ttsText').value='Namaste! Nenu JARVIS, meeru naa seva lo emi aadeshinchalante cheppandi.'">Telugu</div>
+            <div class="chip" onclick="document.getElementById('ttsText').value='The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.'">English Pangram</div>
+            <div class="chip" onclick="document.getElementById('ttsText').value='Breaking news: Artificial Intelligence has achieved a major breakthrough in language understanding and reasoning capabilities.'">News Style</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ VOICE CHAT MODE ═══ -->
+      <div class="tool-mode" id="voiceMode">
+        <div class="tool-header">
+          <h2>🎙️ Voice Chat</h2>
+          <p>Talk to JARVIS using your voice and hear responses spoken back. Hands-free AI conversation.</p>
+        </div>
+        <div class="tool-card" style="text-align:center;padding:40px">
+          <div style="font-size:4rem;margin-bottom:16px" id="voiceModeIcon">🎙️</div>
+          <h3 style="font-size:1.2rem;margin-bottom:8px" id="voiceModeStatus">Tap to start speaking</h3>
+          <p style="color:var(--text-muted);font-size:.85rem;margin-bottom:24px" id="voiceModeDesc">JARVIS will listen and reply with voice</p>
+          <button class="action-btn" id="voiceModBtn" onclick="toggleVoiceMode()" style="padding:14px 32px;font-size:1rem">
+            🎙️ Start Voice Chat
+          </button>
+          <div class="voice-wave" id="voiceModeWave" style="justify-content:center;margin-top:20px">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="tool-card">
+          <h3>📝 Last Conversation</h3>
+          <div style="display:flex;flex-direction:column;gap:8px" id="voiceHistory">
+            <div style="color:var(--text-muted);font-size:.85rem">Voice conversation will appear here...</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end content -->
+  </div><!-- end main -->
+</div><!-- end app -->
+
+<script>
+// ═══ CONFIG ═══
+const SUPABASE_URL = 'https://tbewreqhremesyfdxitj.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXdyZXFocmVtZXN5ZmR4aXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjYzMzU1OTUsImV4cCI6MjA0MTkxMTU5NX0.REC2txMw9LiJi4AoEtWnwBijCKFAUhpxHvNbLiDHGAs';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ═══ STATE ═══
+let currentUser = null;
+let chatHistory = [];
+let isLoading = false;
+let imgB64 = null, imgMime = null;
+let imgAnalysisB64 = null, imgAnalysisMime = null;
+let currentMode = 'chat';
+let recognition = null;
+let isRecording = false;
+let voiceModeActive = false;
+let synth = window.speechSynthesis;
+let voices = [];
+
+// ═══ AUTH ═══
+async function initAuth() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) showApp(session.user);
+  sb.auth.onAuthStateChange((_, session) => {
+    if (session?.user) showApp(session.user);
+    else showLogin();
+  });
+}
+
+function showApp(user) {
+  currentUser = user;
+  document.getElementById('loginScreen').style.display = 'none';
+  const app = document.getElementById('app');
+  app.style.display = 'flex';
+
+  const name = user.user_metadata?.full_name || user.email.split('@')[0];
+  const avatar = user.user_metadata?.avatar_url || '';
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userEmail').textContent = user.email;
+  document.getElementById('userAvatar').src = avatar;
+
+  loadVoices();
+  toast('Welcome back, ' + name.split(' ')[0] + '! 👋', 'success');
+}
+
+function showLogin() {
+  currentUser = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+async function signInGoogle() {
+  const btn = document.getElementById('googleBtn');
+  btn.disabled = true; btn.textContent = 'Redirecting...';
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
+  if (error) { toast(error.message, 'error'); btn.disabled = false; btn.textContent = 'Continue with Google'; }
+}
+
+async function signOut() {
+  await sb.auth.signOut();
+  chatHistory = [];
+  showLogin();
+}
+
+// ═══ MODE SWITCHING ═══
+const modeConfig = {
+  chat:    { title: 'AI Chat', sub: 'Powered by GROQ Llama 3.3 70B + Tavily Search', back: false },
+  image:   { title: '🖼️ Image Analysis', sub: 'Powered by Google Gemini Vision', back: true },
+  search:  { title: '🔍 Web Search', sub: 'Powered by Tavily Real-time Search', back: true },
+  youtube: { title: '▶️ YouTube Summarizer', sub: 'AI-powered video summary & key points', back: true },
+  tts:     { title: '🔊 Text to Speech', sub: 'Free browser speech synthesis engine', back: true },
+  voice:   { title: '🎙️ Voice Chat', sub: 'Speak to JARVIS · Voice replies enabled', back: true },
+};
+
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.tool-mode').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+
+  const cfg = modeConfig[mode];
+  document.getElementById('topbarTitle').textContent = cfg.title;
+  document.getElementById('topbarSub').textContent = cfg.sub;
+
+  const backBtn = document.getElementById('backBtn');
+  if (cfg.back) backBtn.classList.add('show'); else backBtn.classList.remove('show');
+
+  if (mode === 'chat') {
+    document.getElementById('chatMode').style.display = 'flex';
+    document.getElementById('nav-chat').classList.add('active');
+  } else {
+    document.getElementById('chatMode').style.display = 'none';
+    document.getElementById(mode + 'Mode').classList.add('active');
+    document.getElementById('nav-' + mode).classList.add('active');
+  }
+}
+
+// ═══ IMAGE ATTACH (chat) ═══
+function onImgSelect(e) {
+  const f = e.target.files[0]; if (!f) return;
+  if (f.size > 5*1024*1024) { toast('Image too large — max 5MB', 'error'); return; }
+  const r = new FileReader();
+  r.onload = ev => {
+    const [,b64] = ev.target.result.split(',');
+    imgB64 = b64; imgMime = f.type;
+    document.getElementById('imgThumb').src = ev.target.result;
+    document.getElementById('imgName').textContent = f.name;
+    document.getElementById('imgPreviewBar').style.display = 'flex';
+  };
+  r.readAsDataURL(f);
+}
+function removeImg() {
+  imgB64 = null; imgMime = null;
+  document.getElementById('imgPreviewBar').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+}
+
+// ═══ IMAGE ANALYSIS TOOL ═══
+function onImgAnalysisSelect(e) {
+  const f = e.target.files[0]; if (!f) return;
+  processAnalysisFile(f);
+}
+function onImgDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  processAnalysisFile(f);
+}
+function processAnalysisFile(f) {
+  if (f.size > 5*1024*1024) { toast('Image too large — max 5MB', 'error'); return; }
+  const r = new FileReader();
+  r.onload = ev => {
+    const [,b64] = ev.target.result.split(',');
+    imgAnalysisB64 = b64; imgAnalysisMime = f.type;
+    document.getElementById('imgFullThumb').src = ev.target.result;
+    document.getElementById('imgFullPreview').style.display = 'block';
+    document.getElementById('uploadArea').style.display = 'none';
+    toast('Image loaded! Click Analyze to proceed.', 'success');
+  };
+  r.readAsDataURL(f);
+}
+
+async function analyzeImage() {
+  if (!imgAnalysisB64) { toast('Please upload an image first', 'error'); return; }
+  const q = document.getElementById('imgQuestion').value.trim() || 'Describe this image in detail';
+  const resultEl = document.getElementById('imgResult');
+  resultEl.style.display = 'block';
+  resultEl.textContent = '⏳ Analyzing image with Gemini Vision...';
+  try {
+    const token = (await sb.auth.getSession()).data?.session?.access_token;
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ message: q, image: imgAnalysisB64, imageMime: imgAnalysisMime, history: [] })
+    });
+    const data = await res.json();
+    resultEl.textContent = data.reply || 'Analysis failed.';
+  } catch(e) {
+    resultEl.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+// ═══ WEB SEARCH TOOL ═══
+async function doSearch() {
+  const q = document.getElementById('searchQuery').value.trim();
+  if (!q) { toast('Enter a search query', 'error'); return; }
+  const resultEl = document.getElementById('searchResult');
+  resultEl.style.display = 'block';
+  resultEl.textContent = '⏳ Searching the web...';
+  try {
+    const token = (await sb.auth.getSession()).data?.session?.access_token;
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ message: q + ' (search the web for this)', forceSearch: true, history: [] })
+    });
+    const data = await res.json();
+    resultEl.textContent = data.reply || 'No results found.';
+  } catch(e) {
+    resultEl.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+// ═══ YOUTUBE SUMMARIZER ═══
+async function summarizeYT() {
+  const url = document.getElementById('ytUrl').value.trim();
+  if (!url) { toast('Enter a YouTube URL', 'error'); return; }
+  const videoId = extractYTId(url);
+  if (!videoId) { toast('Invalid YouTube URL', 'error'); return; }
+  const resultEl = document.getElementById('ytResult');
+  resultEl.style.display = 'block';
+  resultEl.textContent = '⏳ Fetching video data and generating summary...';
+  try {
+    const token = (await sb.auth.getSession()).data?.session?.access_token;
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        message: `Please search for information about this YouTube video and provide a comprehensive summary. Video URL: ${url} Video ID: ${videoId}. Search for the video title, topic, key points, and main takeaways. Format with: 📌 Video Summary, 🔑 Key Points (bullet list), 💡 Main Takeaways`,
+        forceSearch: true,
+        history: []
+      })
+    });
+    const data = await res.json();
+    resultEl.textContent = data.reply || 'Could not summarize video.';
+  } catch(e) {
+    resultEl.textContent = '❌ Error: ' + e.message;
+  }
+}
+function extractYTId(url) {
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
+// ═══ TEXT TO SPEECH ═══
+function loadVoices() {
+  const load = () => {
+    voices = synth.getVoices();
+    const sel = document.getElementById('voiceSelect');
+    sel.innerHTML = '';
+    voices.forEach((v, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})`;
+      if (v.lang.startsWith('en')) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  };
+  load();
+  if (synth.onvoiceschanged !== undefined) synth.onvoiceschanged = load;
+}
+function speakText() {
+  const text = document.getElementById('ttsText').value.trim();
+  if (!text) { toast('Enter text to speak', 'error'); return; }
+  synth.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  const voiceIdx = document.getElementById('voiceSelect').value;
+  if (voices[voiceIdx]) utt.voice = voices[voiceIdx];
+  utt.rate = parseFloat(document.getElementById('speedSelect').value);
+  utt.pitch = parseFloat(document.getElementById('pitchSelect').value);
+  synth.speak(utt);
+  toast('Speaking...', 'success');
+}
+function stopSpeech() { synth.cancel(); }
+
+// ═══ VOICE INPUT (chat) ═══
+function initSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = false;
+  r.lang = 'en-US';
+  return r;
+}
+
+function toggleVoiceInput() {
+  if (!isRecording) startVoiceInput(); else stopVoiceInput();
+}
+
+function startVoiceInput() {
+  recognition = initSpeechRecognition();
+  if (!recognition) { toast('Voice not supported in this browser', 'error'); return; }
+  isRecording = true;
+  document.getElementById('voiceInputBtn').classList.add('recording');
+  document.getElementById('voiceInputBtn').textContent = '⏹';
+  document.getElementById('voiceWave').classList.add('show');
+  document.getElementById('chatInput').style.display = 'none';
+
+  recognition.onresult = e => {
+    const t = e.results[0][0].transcript;
+    document.getElementById('chatInput').value = t;
+    stopVoiceInput();
+    setTimeout(() => sendChat(), 300);
+  };
+  recognition.onerror = () => stopVoiceInput();
+  recognition.onend = () => stopVoiceInput();
+  recognition.start();
+}
+
+function stopVoiceInput() {
+  isRecording = false;
+  document.getElementById('voiceInputBtn').classList.remove('recording');
+  document.getElementById('voiceInputBtn').textContent = '🎙️';
+  document.getElementById('voiceWave').classList.remove('show');
+  document.getElementById('chatInput').style.display = 'block';
+  if (recognition) { try { recognition.stop(); } catch(e){} }
+}
+
+// ═══ VOICE CHAT MODE ═══
+function toggleVoiceMode() {
+  if (!voiceModeActive) startVoiceMode(); else stopVoiceMode();
+}
+
+function startVoiceMode() {
+  recognition = initSpeechRecognition();
+  if (!recognition) { toast('Voice not supported in your browser', 'error'); return; }
+  voiceModeActive = true;
+  document.getElementById('voiceModBtn').textContent = '⏹ Stop Voice Chat';
+  document.getElementById('voiceModBtn').style.background = 'var(--red)';
+  document.getElementById('voiceModeIcon').textContent = '🔴';
+  document.getElementById('voiceModeStatus').textContent = 'Listening...';
+  document.getElementById('voiceModeDesc').textContent = 'Speak now — JARVIS is listening';
+  document.getElementById('voiceModeWave').classList.add('show');
+
+  recognition.onresult = async e => {
+    const text = e.results[0][0].transcript;
+    document.getElementById('voiceModeStatus').textContent = 'Processing: "' + text + '"';
+    addVoiceHistory('you', text);
+    const reply = await fetchVoiceReply(text);
+    addVoiceHistory('jarvis', reply);
+    speakReply(reply);
+    if (voiceModeActive) setTimeout(() => { recognition.start(); }, 2000);
+  };
+  recognition.onerror = () => { if (voiceModeActive) setTimeout(() => recognition.start(), 1000); };
+  recognition.onend = () => { if (voiceModeActive) setTimeout(() => recognition.start(), 500); };
+  recognition.start();
+}
+
+function stopVoiceMode() {
+  voiceModeActive = false;
+  synth.cancel();
+  if (recognition) try { recognition.stop(); } catch(e){}
+  document.getElementById('voiceModBtn').textContent = '🎙️ Start Voice Chat';
+  document.getElementById('voiceModBtn').style.background = '';
+  document.getElementById('voiceModeIcon').textContent = '🎙️';
+  document.getElementById('voiceModeStatus').textContent = 'Tap to start speaking';
+  document.getElementById('voiceModeDesc').textContent = 'JARVIS will listen and reply with voice';
+  document.getElementById('voiceModeWave').classList.remove('show');
+}
+
+async function fetchVoiceReply(text) {
+  try {
+    const token = (await sb.auth.getSession()).data?.session?.access_token;
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ message: text, history: chatHistory.slice(-6) })
+    });
+    const data = await res.json();
+    return data.reply || 'I could not process that, sir.';
+  } catch(e) {
+    return 'Network error. Please try again.';
+  }
+}
+
+function speakReply(text) {
+  synth.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  const voicesList = synth.getVoices();
+  const preferred = voicesList.find(v => v.lang.startsWith('en') && v.name.includes('Google'));
+  if (preferred) utt.voice = preferred;
+  utt.rate = 1; utt.pitch = 1;
+  document.getElementById('voiceModeStatus').textContent = 'Speaking...';
+  utt.onend = () => {
+    if (voiceModeActive) document.getElementById('voiceModeStatus').textContent = 'Listening...';
+  };
+  synth.speak(utt);
+}
+
+function addVoiceHistory(role, text) {
+  const container = document.getElementById('voiceHistory');
+  if (container.querySelector('[data-placeholder]')) container.innerHTML = '';
+  const div = document.createElement('div');
+  div.style.cssText = `padding:10px 14px;border-radius:8px;font-size:.85rem;line-height:1.5;background:${role==='you'?'var(--accent-dim)':'var(--surface2)'};border:1px solid ${role==='you'?'rgba(99,102,241,.2)':'var(--border)'}`;
+  div.innerHTML = `<strong style="font-size:.7rem;color:${role==='you'?'var(--accent)':'var(--green)'}">${role==='you'?'YOU':'JARVIS'}</strong><br>${esc(text)}`;
+  container.appendChild(div);
+}
+
+// ═══ CHAT ═══
+async function sendChat() {
+  if (isLoading || !currentUser) return;
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text && !imgB64) return;
+
+  const empty = document.getElementById('emptyState');
+  if (empty) empty.remove();
+
+  addMsg('user', text || '🖼️ Image uploaded');
+  input.value = ''; resize(input);
+  const b64 = imgB64, mime = imgMime;
+  removeImg();
+
+  const tid = showTyping();
+  isLoading = true;
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const token = (await sb.auth.getSession()).data?.session?.access_token;
+    const payload = { message: text || 'Analyze this image', history: chatHistory };
+    if (b64) { payload.image = b64; payload.imageMime = mime; }
+
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    removeTyping(tid);
+
+    if (res.status === 401) { signOut(); return; }
+
+    const reply = data.reply || 'No response.';
+    addMsg('assistant', reply, data.model, data.searchUsed ? data.searchQuery : null);
+
+    // Auto speak reply if voice mode
+    if (voiceModeActive) speakReply(reply);
+
+    chatHistory.push({ role: 'user', content: text || 'Image' });
+    chatHistory.push({ role: 'assistant', content: reply });
+    if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
+
+  } catch(e) {
+    removeTyping(tid);
+    addMsg('assistant', '⚠️ Error: ' + e.message);
+  } finally {
+    isLoading = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+}
+
+function addMsg(role, content, model, searchQuery) {
+  const container = document.getElementById('chatMsgs');
+  const msg = document.createElement('div');
+  msg.className = 'msg ' + role;
+
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  if (role === 'user') {
+    const img = document.getElementById('userAvatar');
+    if (img.src && !img.src.includes('data:image/svg')) {
+      const i = document.createElement('img');
+      i.src = img.src;
+      i.style.cssText = 'width:32px;height:32px;border-radius:50%;object-fit:cover';
+      av.appendChild(i);
+    } else { av.textContent = '👤'; }
+  } else { av.textContent = '🤖'; }
+
+  const body = document.createElement('div');
+  body.className = 'msg-body';
+
+  const meta = document.createElement('div');
+  meta.className = 'msg-meta';
+  meta.textContent = role === 'user' ? 'You' : 'JARVIS';
+  if (model) {
+    const b = document.createElement('span');
+    b.className = 'msg-badge'; b.textContent = model;
+    meta.appendChild(b);
+  }
+  body.appendChild(meta);
+
+  if (searchQuery) {
+    const sb2 = document.createElement('div');
+    sb2.className = 'msg-search-badge';
+    sb2.textContent = '🔍 Searched: ' + searchQuery;
+    body.appendChild(sb2);
+  }
+
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = fmt(content);
+  body.appendChild(bubble);
+
+  msg.appendChild(av);
+  msg.appendChild(body);
+  container.appendChild(msg);
+  container.scrollTop = container.scrollHeight;
+}
+
+function showTyping() {
+  const container = document.getElementById('chatMsgs');
+  const id = 'ty_' + Date.now();
+  const msg = document.createElement('div');
+  msg.className = 'msg assistant'; msg.id = id;
+  const av = document.createElement('div'); av.className = 'msg-avatar'; av.textContent = '🤖';
+  const body = document.createElement('div'); body.className = 'msg-body';
+  const m = document.createElement('div'); m.className = 'msg-meta'; m.textContent = 'JARVIS';
+  const b = document.createElement('div'); b.className = 'msg-bubble';
+  const t = document.createElement('div'); t.className = 'typing-dots';
+  t.innerHTML = '<span></span><span></span><span></span>';
+  b.appendChild(t); body.appendChild(m); body.appendChild(b);
+  msg.appendChild(av); msg.appendChild(body);
+  container.appendChild(msg); container.scrollTop = container.scrollHeight;
+  return id;
+}
+function removeTyping(id) { const el = document.getElementById(id); if(el) el.remove(); }
+
+function esc(t) { return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmt(text) {
+  return esc(text)
+    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g,'<em>$1</em>')
+    .replace(/`(.*?)`/g,'<code style="font-family:JetBrains Mono,monospace;font-size:.85em;background:rgba(0,0,0,.2);padding:1px 5px;border-radius:3px">$1</code>')
+    .replace(/\n/g,'<br>');
+}
+function setQ(t) {
+  switchMode('chat');
+  const i = document.getElementById('chatInput');
+  i.value = t; resize(i); i.focus();
+  const e = document.getElementById('emptyState');
+  if (e) e.remove();
+}
+function onKey(e) { if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); sendChat(); } }
+function resize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// Init
+initAuth();
+</script>
+</body>
+</html>
