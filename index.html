@@ -809,7 +809,7 @@ async function analyzeImage() {
   resultEl.textContent = '⏳ Analyzing image with Gemini Vision...';
   try {
     const token = (await sb.auth.getSession()).data?.session?.access_token;
-    const res = await fetch('/.netlify/functions/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ message: q, image: imgAnalysisB64, imageMime: imgAnalysisMime, history: [] })
