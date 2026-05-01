@@ -659,7 +659,7 @@ textarea::placeholder{color:var(--text-muted)}
 <script>
 // ═══ CONFIG ═══
 const SUPABASE_URL = 'https://tbewreqhremesyfdxitj.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXdyZXFocmVtZXN5ZmR4aXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3Nzc1OTUsImV4cCI6MjA5MjM1MzU5NX0.REC2txMw9LiJi4AoEtWnwBijCKFAUhpxHvNbLiDHGAs';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXdyZXFocmVtZXN5ZmR4aXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjYzMzU1OTUsImV4cCI6MjA0MTkxMTU5NX0.REC2txMw9LiJi4AoEtWnwBijCKFAUhpxHvNbLiDHGAs';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -830,7 +830,7 @@ async function doSearch() {
   resultEl.textContent = '⏳ Searching the web...';
   try {
     const token = (await sb.auth.getSession()).data?.session?.access_token;
-    const res = await fetch('/.netlify/functions/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ message: q + ' (search the web for this)', forceSearch: true, history: [] })
@@ -853,7 +853,7 @@ async function summarizeYT() {
   resultEl.textContent = '⏳ Fetching video data and generating summary...';
   try {
     const token = (await sb.auth.getSession()).data?.session?.access_token;
-    const res = await fetch('/.netlify/functions/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
@@ -993,7 +993,7 @@ function stopVoiceMode() {
 async function fetchVoiceReply(text) {
   try {
     const token = (await sb.auth.getSession()).data?.session?.access_token;
-    const res = await fetch('/.netlify/functions/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({ message: text, history: chatHistory.slice(-6) })
@@ -1052,7 +1052,7 @@ async function sendChat() {
     const payload = { message: text || 'Analyze this image', history: chatHistory };
     if (b64) { payload.image = b64; payload.imageMime = mime; }
 
-    const res = await fetch('/.netlify/functions/chat', {
+    const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify(payload)
@@ -1158,6 +1158,7 @@ function fmt(text) {
 function setQ(t) {
   switchMode('chat');
   const i = document.getElementById('chatInput');
+
   i.value = t; resize(i); i.focus();
   const e = document.getElementById('emptyState');
   if (e) e.remove();
