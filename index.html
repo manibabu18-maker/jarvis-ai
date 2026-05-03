@@ -678,12 +678,15 @@ let voices = [];
 
 // ═══ AUTH ═══
 async function initAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) showApp(session.user);
-  sb.auth.onAuthStateChange((_, session) => {
-    if (session?.user) showApp(session.user);
-    else showLogin();
-  });
+  // Login skip - direct guest mode
+  const fakeUser = {
+    email: 'guest@jarvis.ai',
+    user_metadata: { 
+      full_name: 'Guest User', 
+      avatar_url: '' 
+    }
+  };
+  showApp(fakeUser);
 }
 
 function showApp(user) {
@@ -701,13 +704,13 @@ function showApp(user) {
   loadVoices();
   toast('Welcome back, ' + name.split(' ')[0] + '! 👋', 'success');
 }
-
+/*
 function showLogin() {
   currentUser = null;
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
 }
-
+*/
 async function signInGoogle() {
   const btn = document.getElementById('googleBtn');
   btn.disabled = true; btn.textContent = 'Redirecting...';
@@ -1048,13 +1051,12 @@ async function sendChat() {
   document.getElementById('sendBtn').disabled = true;
 
   try {
-    const token = (await sb.auth.getSession()).data?.session?.access_token;
     const payload = { message: text || 'Analyze this image', history: chatHistory };
     if (b64) { payload.image = b64; payload.imageMime = mime; }
 
     const res = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
