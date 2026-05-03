@@ -20,16 +20,32 @@ export default async function handler(req, res) {
     // NEWS MODE - Using NewsAPI
     const isNewsQuery = /\b(today|news|headlines|latest|current)\b/i.test(message);
 
-    if (isNewsQuery && process.env.NEWS_API_KEY) {
+       if (isNewsQuery && process.env.NEWS_API_KEY) {
       searchUsed = true;
       searchQuery = message;
-      modelUsed = 'NewsAPI';
+      modelUsed = 'NewsData.io';
 
       try {
-        const url = `https://newsapi.org/v2/top-headlines?language=en&pageSize=5&apiKey=${process.env.NEWS_API_KEY}`;
+        // NewsData.io API - nee key ki correct URL
+        const url = `https://newsdata.io/api/1/news?apikey=${process.env.NEWS_API_KEY}&language=en&category=top&size=5`;
         const newsRes = await fetch(url);
         const newsData = await newsRes.json();
 
+        if (newsData.status === 'success' && newsData.results?.length) {
+          const newsList = newsData.results.map((article, index) =>
+            `${index + 1}. ${article.title}\n   Source: ${article.source_id || 'News'}`
+          ).join('\n\n');
+
+          finalReply = `Here are today's top world headlines:\n\n${newsList}`;
+        } else {
+          finalReply = 'Could not fetch news. API response: ' + JSON.stringify(newsData);
+        }
+      } catch(e) {
+        finalReply = 'News API error: ' + e.message;
+      }
+
+      return res.status(200).json({ reply: finalReply, model: modelUsed, searchUsed, searchQuery });
+    }
         if (newsData.status === 'ok' && newsData.articles?.length) {
           const newsList = newsData.articles.map((article, index) =>
             `${index + 1}. ${article.title}\n Source: ${article.source.name}`
