@@ -1,16 +1,23 @@
 export default async function handler(req, res) {
-  // CORS
+  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') return res.status(405).json({ reply: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ reply: 'Method not allowed' });
+  }
 
-  // Auth check
+  // GOOGLE LOGIN CHECK - Security kosam
   const token = (req.headers.authorization || '').replace('Bearer ', '').trim();
-  if (!token) return res.status(401).json({ reply: 'Unauthorized. Please sign in.' });
+  if (!token) {
+    return res.status(401).json({ 
+      reply: '⚠️ Please sign in with Google to access JARVIS.' 
+    });
+  }
 
+  // Verify Supabase token
   try {
     const verifyRes = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
       headers: {
@@ -18,133 +25,87 @@ export default async function handler(req, res) {
         'apikey': process.env.SUPABASE_ANON_KEY
       }
     });
-    if (!verifyRes.ok) return res.status(401).json({ reply: 'Session expired. Please sign in again.' });
-  } catch(e) {
-    return res.status(401).json({ reply: 'Auth error: ' + e.message });
+    
+    if (!verifyRes.ok) {
+      return res.status(401).json({ reply: 'Session expired. Please sign in again.' });
+    }
+  } catch (e) {
+    return res.status(401).json({ reply: 'Auth verification failed: ' + e.message });
   }
 
+  // MAIN LOGIC
   try {
-    const { message, image, imageMime, history = [], forceSearch } = req.body;
+    const { message } = req.body;
 
-    if (!message && !image) return res.status(400).json({ reply: 'No message provided.' });
-    if (!process.env.GROQ_API_KEY) return res.status(500).json({ reply: 'GROQ API key missing.' });
-
-    let finalReply = '';
-    let modelUsed = 'GROQ LLAMA-3.3-70B';
-    let searchUsed = false;
-    let searchQuery = null;
-
-    // IMAGE MODE
-    if (image && process.env.GEMINI_API_KEY) {
-      modelUsed = 'GEMINI 1.5 FLASH';
-      const gRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                { text: `You are JARVIS, a professional AI assistant. Analyze this image and answer: ${message || 'Describe this image in detail'}` },
-                { inline_data: { mime_type: imageMime || 'image/jpeg', data: image } }
-              ]
-            }]
-          })
-        }
-      );
-      const gData = await gRes.json();
-      finalReply = gData.candidates?.[0]?.content?.parts?.[0]?.text || 'Image analysis failed.';
-      return res.status(200).json({ reply: finalReply, model: modelUsed });
+    if (!message) {
+      return res.status(400).json({ reply: 'No message provided.' });
     }
 
-    // SEARCH MODE
-    const needsSearch = forceSearch || /\b(today|news|latest|current|price|weather|score|winner|trending)\b/i.test(message);
+    // Check if user asking for news
+    const isNewsQuery = /\b(news|headlines|latest|today|current|breaking|world|india|ai)\b/i.test(message);
 
-    if (needsSearch && process.env.TAVILY_API_KEY) {
-      searchUsed = true;
-      searchQuery = message;
-      let context = '';
+    if (isNewsQuery) {
+      // NEWS_API_KEY check
+      if (!process.env.NEWS_API_KEY) {
+        return res.status(200).json({ 
+          reply: 'NEWS_API_KEY not configured. Admin, please add it in Vercel Environment Variables.',
+          model: 'JARVIS'
+        });
+      }
 
       try {
-        const tvRes = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: process.env.TAVILY_API_KEY,
-            query: message,
-            search_depth: 'basic',
-            max_results: 5
-          })
-        });
-        const tvData = await tvRes.json();
-        if (tvData.results?.length) {
-          context = tvData.results.map(r => `${r.title}: ${r.content}`).join('\n\n');
+        // NewsData.io /latest endpoint
+        const url = `https://newsdata.io/api/1/latest?apikey=${process.env.NEWS_API_KEY}&language=en&size=5`;
+        const newsRes = await fetch(url);
+        
+        if (!newsRes.ok) {
+          throw new Error(`News API returned ${newsRes.status}`);
         }
-      } catch(e) { console.log('Tavily error:', e.message); }
 
-      if (process.env.GEMINI_API_KEY && context) {
-        modelUsed = 'GROQ + TAVILY + GEMINI';
-        try {
-          const gRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{
-                    text: `You are JARVIS. User asked: "${message}"\n\nWeb results:\n${context}\n\nGive clear professional answer. Use bullet points. Reply in Telugu if user wrote Telugu.`
-                  }]
-                }]
-              })
-            }
-          );
-          const gData = await gRes.json();
-          finalReply = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        } catch(e) { console.log('Gemini error:', e.message); }
-      }
+        const newsData = await newsRes.json();
 
-      if (!finalReply) {
-        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages: [
-              { role: 'system', content: `You are JARVIS. Search context: ${context}` },
-              { role: 'user', content: message }
-            ],
-            temperature: 0.5, max_tokens: 800
-          })
+        if (newsData.status === 'success' && newsData.results?.length > 0) {
+          const newsList = newsData.results.slice(0, 5).map((article, index) =>
+            `${index + 1}. ${article.title}\n   Source: ${article.source_id || article.source_name || 'News'}`
+          ).join('\n\n');
+
+          return res.status(200).json({ 
+            reply: `Here are today's top world headlines:\n\n${newsList}`,
+            model: 'NewsData.io',
+            searchUsed: true
+          });
+        } else if (newsData.status === 'error') {
+          return res.status(200).json({ 
+            reply: `News API Error: ${newsData.results?.message || 'Check your API key or quota'}`,
+            model: 'NewsData.io'
+          });
+        } else {
+          return res.status(200).json({ 
+            reply: 'No news found right now. Try again in a few minutes.',
+            model: 'NewsData.io'
+          });
+        }
+
+      } catch (newsError) {
+        console.error('News fetch error:', newsError);
+        return res.status(200).json({ 
+          reply: `Failed to fetch news: ${newsError.message}. Check NEWS_API_KEY in Vercel.`,
+          model: 'JARVIS'
         });
-        const groqData = await groqRes.json();
-        finalReply = groqData.choices?.[0]?.message?.content || 'No answer found.';
-        modelUsed = 'GROQ + TAVILY';
       }
-
-    } else {
-      // CHAT MODE
-      const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [
-            { role: 'system', content: 'You are JARVIS, a professional AI assistant. Be helpful, clear, concise. Reply in Telugu if user writes Telugu.' },
-            ...history.slice(-8),
-            { role: 'user', content: message }
-          ],
-          temperature: 0.7, max_tokens: 600
-        })
-      });
-      const groqData = await groqRes.json();
-      finalReply = groqData.choices?.[0]?.message?.content || 'No response generated.';
     }
 
-    return res.status(200).json({ reply: finalReply, model: modelUsed, searchUsed, searchQuery });
+    // Normal chat reply
+    return res.status(200).json({ 
+      reply: `Hello! I'm JARVIS. Ask me "today news" for latest headlines from around the world.`,
+      model: 'JARVIS'
+    });
 
-  } catch(error) {
-    console.error('JARVIS Error:', error);
-    return res.status(500).json({ reply: 'Server error: ' + error.message });
+  } catch (error) {
+    console.error('Server Error:', error);
+    return res.status(500).json({ 
+      reply: 'Server error occurred. Please try again.',
+      error: error.message 
+    });
   }
 }
