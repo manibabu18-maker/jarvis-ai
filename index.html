@@ -656,11 +656,11 @@ textarea::placeholder{color:var(--text-muted)}
   </div><!-- end main -->
 </div><!-- end app -->
 
-<script>
+<script type="module">
 // ═══ CONFIG ═══
 const SUPABASE_URL = 'https://tbewreqhremesyfdxitj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXdyZXFocmVtZXN5ZmR4aXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjYzMzU1OTUsImV4cCI6MjA0MTkxMTU5NX0.REC2txMw9LiJi4AoEtWnwBijCKFAUhpxHvNbLiDHGAs';
-const { createClient } = supabase;
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
        auth: {
          detectSessionInUrl: true,
