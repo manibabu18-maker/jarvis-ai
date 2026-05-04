@@ -677,12 +677,7 @@ let synth = window.speechSynthesis;
 let voices = [];
 
 // ═══ AUTH ═══
- async function initAuth() {
-  // Handle OAuth callback
-  if (window.location.hash.includes('access_token')) {
-    await sb.auth.getSession();
-    window.location.hash = '';
-  }
+async function initAuth() {
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) showApp(session.user);
   sb.auth.onAuthStateChange((_, session) => {
