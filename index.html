@@ -656,18 +656,12 @@ textarea::placeholder{color:var(--text-muted)}
   </div><!-- end main -->
 </div><!-- end app -->
 
-<script type="module">
+<script>
 // ═══ CONFIG ═══
 const SUPABASE_URL = 'https://tbewreqhremesyfdxitj.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRiZXdyZXFocmVtZXN5ZmR4aXRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjYzMzU1OTUsImV4cCI6MjA0MTkxMTU5NX0.REC2txMw9LiJi4AoEtWnwBijCKFAUhpxHvNbLiDHGAs';
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm'
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-       auth: {
-         detectSessionInUrl: true,
-         persistSession: true,
-         autoRefreshToken: true
-       }
-     });
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ═══ STATE ═══
 let currentUser = null;
@@ -684,6 +678,19 @@ let voices = [];
 
 // ═══ AUTH ═══
 async function initAuth() {
+  // Handle Google OAuth redirect with token in URL hash
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.substring(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token') || '';
+    if (accessToken) {
+      const { data } = await sb.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+      window.history.replaceState(null, '', window.location.pathname);
+      if (data?.user) { showApp(data.user); return; }
+    }
+    window.history.replaceState(null, '', window.location.pathname);
+  }
   const { data: { session } } = await sb.auth.getSession();
   if (session?.user) showApp(session.user);
   sb.auth.onAuthStateChange((_, session) => {
